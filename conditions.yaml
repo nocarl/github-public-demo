@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Create EC2 instance and adding Volume using conditions"
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+       -dev
+       -stage
+       -Prod
+    Default: dev
+    Description: select Environment
+
+Mappings:
+  EnvMap:
+    dev:
+      instanceType: t2.micro
+      name: dev
+    stage:
+      instanceType: t2.small
+      name: stage
+    prod:
+      instanceType: t2.large
+      name: prod
+
+      Conditions:
+       CreateProdResources: !Equals [!Ref EnvironmentType, prod]
+
+
+Resources:
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+       InstanceType: !FindInMap [EnvMap, !Ref Environment, instanceType]
+       ImageId: ami-053b0d53c279acc90
+       KeyName: cloudformation
+       Tags:
+        - Key: Name
+          Value: !FindInMap [EnvMap, !Ref Environment, name]
+  NewVolume:
+    Type: AWS::EC2::Volume
+    Condition: CreateProdResources
+    Properties:
+      Size: 100
+      AvailabityZone:
+        !GetAtt Instance.AvailabilityZone
+      Tags:
+        - Key: Name
+          Value: !FindInMap [EnvMap, !Ref Environment, name]
+  AttachVolume:
+  Type: AWS::EC2::VolumeAttachment
+  Condition: CreateProdResources
+  Properties:
+    Device: /dev/sdh
+    InstanceId: !Ref Instance
+    VolumeId: !Ref NewVolume
+
+Outputs:
+  InstanceId: 
+    Value: !Ref Instance
+  VolumeId:
+    Condition: CreateProdResources
+    Value: !Ref NewVolume
